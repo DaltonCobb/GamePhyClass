@@ -11,24 +11,32 @@ public class World : MonoBehaviour
     public FloatData gravitation;
     public FloatData fixedFPS;
     public StringData fpsText;
+    public VectorField vectorField;
 
     static World instance;
     static public World Instance { get { return instance; } }
 
     public Vector2 Gravity { get { return new Vector2(0, gravity.value); } }
     public List<Body> bodies { get; set; } = new List<Body>();
-
+    public List<Spring> springs { get; set; } = new List<Spring>();
+    public List<Force> forces { get; set; } = new List<Force>();
     float fixedDeltaTime { get { return 1.0f / fixedFPS.value; } }
     float fps = 0;
     float timeAccumulator;
     float fpsAverage = 0;
     float smoothing = 0.975f;
 
+    public Vector2 WorldSize { get => size * 2; }
+    public AABB AABB { get => aabb; }
+
+    AABB aabb;
     Vector2 size;
+  
     private void Awake()
     {
         instance = this;
         size = Camera.main.ViewportToWorldPoint(Vector2.one);
+        aabb = new AABB(Vector2.zero, size * 2);
     }
     void Update()
     {
@@ -38,9 +46,14 @@ public class World : MonoBehaviour
         fpsAverage = (fpsAverage * smoothing) + (fps * (1.0f - smoothing));
         fpsText.value = "FPS: " + fpsAverage.ToString("F1");
 
-        if (!simulate) return;
-        GravitationalForce.ApplyForce(bodies, gravitation);
+        springs.ForEach(spring => spring.Draw());
 
+        if (!simulate) return;
+
+        GravitationalForce.ApplyForce(bodies, gravitation);
+        forces.ForEach(force => bodies.ForEach(body => force.ApplyForce(body)));
+        springs.ForEach(spring => spring.ApplyForce());
+        bodies.ForEach(body => vectorField.ApplyForce(body));
 
         timeAccumulator = timeAccumulator + Time.deltaTime;
         while (timeAccumulator >= fixedDeltaTime)
